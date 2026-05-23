@@ -3421,7 +3421,205 @@ async function resetDailyCounter() {
         showToast('حدث خطأ في إنشاء الحساب: ' + error.message, 'error');
     }
 }
+     // ==================== إصلاح نهائي لصفحة التقارير ====================
+
+// إضافة مستمع للتبويب reports
+const originalShowAdminTab = showAdminTab;
+window.showAdminTab = function(tab) {
+    originalShowAdminTab(tab);
+    if (tab === 'reports') {
+        console.log('📊 تم فتح تبويب التقارير، جاري التحميل...');
+        setTimeout(() => {
+            renderReports();
+        }, 100);
+    }
+};
+
+// إصلاح دالة renderReports بشكل كامل
+window.renderReports = async function() {
+    console.log('📊 بدء تحميل التقارير...');
+    
+    try {
+        // محاولة جلب الطلبات من Firebase
+        let allOrders = [];
         
+        // الطريقة الأولى: من all_orders
+        const allOrdersSnapshot = await database.ref('all_orders').once('value');
+        const allOrdersData = allOrdersSnapshot.val();
+        
+        if (allOrdersData) {
+            allOrders = Object.values(allOrdersData);
+            console.log('✅ تم جلب', allOrders.length, 'طلب من all_orders');
+        }
+        
+        // الطريقة الثانية: من مسار المستخدمين إذا كان الأول فارغاً
+        if (allOrders.length === 0) {
+            const usersSnapshot = await database.ref('users').once('value');
+            const usersData = usersSnapshot.val();
+            
+            if (usersData) {
+                for (const userId in usersData) {
+                    const ordersSnapshot = await database.ref(`users/${userId}/orders`).once('value');
+                    const userOrders = ordersSnapshot.val();
+                    if (userOrders && Array.isArray(userOrders)) {
+                        allOrders.push(...userOrders);
+                    }
+                }
+                console.log('✅ تم جلب', allOrders.length, 'طلب من مسار المستخدمين');
+            }
+        }
+        
+        // إذا لم توجد طلبات
+        if (allOrders.length === 0) {
+            console.log('⚠️ لا توجد طلبات لعرضها');
+            
+            // عرض رسالة "لا توجد طلبات"
+            const reportsContainer = document.getElementById('reports-delivered-orders');
+            if (reportsContainer) {
+                reportsContainer.innerHTML = `
+                    <div style="text-align:center; padding:50px; background:#f8f9fa; border-radius:12px;">
+                        <i class="fas fa-shopping-bag" style="font-size:48px; color:#E5C97B; margin-bottom:15px;"></i>
+                        <p style="font-size:16px; color:#666;">📭 لا توجد طلبات بعد</p>
+                        <p style="font-size:14px; color:#999;">عندما يقوم عميل بإنشاء طلب، سيظهر هنا تلقائياً</p>
+                    </div>
+                `;
+            }
+            
+            // تعيين الإحصائيات إلى صفر
+            const elements = ['reports-total-sales', 'reports-total-profit', 'reports-total-orders', 
+                             'reports-pending', 'reports-delivered', 'reports-cancelled', 'reports-returned'];
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = '0';
+            });
+            return;
+        }
+        
+        // حساب الإحصائيات
+        const pendingOrders = allOrders.filter(o => o.status === 'pending').length;
+        const deliveredOrders = allOrders.filter(o => o.status === 'delivered').length;
+        const cancelledOrders = allOrders.filter(o => o.status === 'cancelled').length;
+        const returnedOrders = allOrders.filter(o => o.status === 'returned').length;
+        
+        const totalSales = allOrders.filter(o => o.status === 'delivered').reduce((a, o) => a + (o.total || 0), 0);
+        
+        // حساب الأرباح
+        let totalProfit = 0;
+        for (const order of allOrders) {
+            if (order.status === 'delivered' && order.items) {
+                for (const item of order.items) {
+                    const product = products.find(p => p.id == item.id);
+                    if (product) {
+                        totalProfit += ((product.price || 0) - (product.cost || 0)) * (item.quantity || 0);
+                    }
+                }
+            }
+        }
+        
+        // تحديث الإحصائيات
+        document.getElementById('reports-total-sales') && (document.getElementById('reports-total-sales').innerText = totalSales.toFixed(2));
+        document.getElementById('reports-total-profit') && (document.getElementById('reports-total-profit').innerText = totalProfit.toFixed(2));
+        document.getElementById('reports-total-orders') && (document.getElementById('reports-total-orders').innerText = allOrders.length);
+        document.getElementById('reports-pending') && (document.getElementById('reports-pending').innerText = pendingOrders);
+        document.getElementById('reports-delivered') && (document.getElementById('reports-delivered').innerText = deliveredOrders);
+        document.getElementById('reports-cancelled') && (document.getElementById('reports-cancelled').innerText = cancelledOrders);
+        document.getElementById('reports-returned') && (document.getElementById('reports-returned').innerText = returnedOrders);
+        
+        // عرض آخر 10 طلبات
+        const lastOrders = [...allOrders].sort((a, b) => {
+            const dateA = a.createdAt || a.date || '';
+            const dateB = b.createdAt || b.date || '';
+            return new Date(dateB) - new Date(dateA);
+        }).slice(0, 10);
+        
+        const reportsContainer = document.getElementById('reports-delivered-orders');
+        if (reportsContainer) {
+            let html = `
+                <style>
+                    .reports-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+                    .reports-table th, .reports-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: right; }
+                    .reports-table th { background: #164E63; color: white; font-weight: 600; }
+                    .reports-table tr:hover { background: #f5f5f5; }
+                    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+                    .status-pending { background: #fff3cd; color: #856404; }
+                    .status-delivered { background: #d4edda; color: #155724; }
+                    .status-cancelled { background: #f8d7da; color: #721c24; }
+                    .status-returned { background: #e2e3e5; color: #383d41; }
+                </style>
+                <h4 style="margin: 20px 0 10px 0; color: #164E63;">📋 آخر الطلبات</h4>
+                <div style="overflow-x: auto;">
+                    <table class="reports-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>رقم الطلب</th>
+                                <th>العميل</th>
+                                <th>الهاتف</th>
+                                <th>الإجمالي</th>
+                                <th>الحالة</th>
+                                <th>التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            lastOrders.forEach((order, idx) => {
+                const orderNum = order.orderNumber || order.number || order.orderId || '---';
+                const customerName = order.user?.name || order.userName || '---';
+                const customerPhone = order.user?.phone || order.userPhone || '---';
+                const orderTotal = order.total || 0;
+                const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString('ar-EG') : '---');
+                const statusClass = `status-${order.status || 'pending'}`;
+                const statusText = order.status === 'pending' ? 'معلق' : 
+                                  (order.status === 'delivered' ? 'تم التسليم' : 
+                                  (order.status === 'cancelled' ? 'ملغي' : 'مرتجع'));
+                
+                html += `
+                    <tr>
+                        <td>${idx + 1}</td>
+                        <td><strong>${orderNum}</strong></td>
+                        <td>${customerName}</td>
+                        <td>${customerPhone}</td>
+                        <td>${orderTotal} ج.م</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td><small>${orderDate}</small></td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            reportsContainer.innerHTML = html;
+        }
+        
+        console.log('✅ تم تحديث التقارير بنجاح - عدد الطلبات:', allOrders.length);
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل التقارير:', error);
+        const reportsContainer = document.getElementById('reports-delivered-orders');
+        if (reportsContainer) {
+            reportsContainer.innerHTML = `
+                <div style="text-align:center; padding:50px; background:#f8f9fa; border-radius:12px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size:48px; color:#dc3545; margin-bottom:15px;"></i>
+                    <p style="font-size:16px; color:#666;">❌ حدث خطأ في تحميل التقارير</p>
+                    <p style="font-size:14px; color:#999;">يرجى تحديث الصفحة والمحاولة مرة أخرى</p>
+                </div>
+            `;
+        }
+    }
+};
+
+// تشغيل التقرير عند تحميل الصفحة إذا كان التبويب نشطاً
+setTimeout(() => {
+    const activeSection = document.querySelector('.admin-section.active');
+    if (activeSection && activeSection.id === 'admin-reports') {
+        renderReports();
+    }
+}, 1000);   
         async function customLogin() {
             const username = document.getElementById('custom-username')?.value || '';
             const password = document.getElementById('custom-password')?.value || '';
