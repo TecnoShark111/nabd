@@ -5714,40 +5714,21 @@ if (editProductForm) {
     });
 }
 
-       // إصلاح دالة renderReports
+     // إصلاح نهائي لدالة renderReports
 async function renderReports() {
     console.log('📊 جاري تحميل التقارير...');
     
     const allOrders = await getAllOrdersFromAllUsers();
     console.log('📦 عدد الطلبات المستلمة:', allOrders.length);
     
-    if (!allOrders || allOrders.length === 0) {
-        // عرض رسالة إذا لم توجد طلبات
-        const reportsDeliveredOrders = document.getElementById('reports-delivered-orders');
-        if (reportsDeliveredOrders) {
-            reportsDeliveredOrders.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">📭 لا توجد طلبات بعد</div>';
-        }
-        
-        // تعيين القيم صفر
-        const totalSalesEl = document.getElementById('reports-total-sales');
-        const totalProfitEl = document.getElementById('reports-total-profit');
-        const totalOrdersEl = document.getElementById('reports-total-orders');
-        const pendingEl = document.getElementById('reports-pending');
-        const deliveredEl = document.getElementById('reports-delivered');
-        const cancelledEl = document.getElementById('reports-cancelled');
-        const returnedEl = document.getElementById('reports-returned');
-        
-        if (totalSalesEl) totalSalesEl.innerText = '0';
-        if (totalProfitEl) totalProfitEl.innerText = '0';
-        if (totalOrdersEl) totalOrdersEl.innerText = '0';
-        if (pendingEl) pendingEl.innerText = '0';
-        if (deliveredEl) deliveredEl.innerText = '0';
-        if (cancelledEl) cancelledEl.innerText = '0';
-        if (returnedEl) returnedEl.innerText = '0';
-        
-        return;
-    }
+    // عرض إحصائيات عامة (من جميع الطلبات وليس فقط المسلمة)
+    const totalOrders = allOrders.length;
+    const pendingOrders = allOrders.filter(o => o.status === 'pending').length;
+    const deliveredOrders = allOrders.filter(o => o.status === 'delivered').length;
+    const cancelledOrders = allOrders.filter(o => o.status === 'cancelled').length;
+    const returnedOrders = allOrders.filter(o => o.status === 'returned').length;
     
+    // حساب إجمالي المبيعات (من الطلبات المسلمة فقط)
     const delivered = allOrders.filter(o => o.status === 'delivered');
     const totalSales = delivered.reduce((a, o) => a + (o.total || 0), 0);
     
@@ -5765,7 +5746,7 @@ async function renderReports() {
         }
     }
     
-    // تحديث الإحصائيات
+    // تحديث الإحصائيات في الصفحة
     const totalSalesEl = document.getElementById('reports-total-sales');
     const totalProfitEl = document.getElementById('reports-total-profit');
     const totalOrdersEl = document.getElementById('reports-total-orders');
@@ -5776,55 +5757,70 @@ async function renderReports() {
     
     if (totalSalesEl) totalSalesEl.innerText = totalSales.toFixed(2);
     if (totalProfitEl) totalProfitEl.innerText = totalProfit.toFixed(2);
-    if (totalOrdersEl) totalOrdersEl.innerText = allOrders.length;
-    if (pendingEl) pendingEl.innerText = allOrders.filter(o => o.status === 'pending').length;
-    if (deliveredEl) deliveredEl.innerText = delivered.length;
-    if (cancelledEl) cancelledEl.innerText = allOrders.filter(o => o.status === 'cancelled').length;
-    if (returnedEl) returnedEl.innerText = allOrders.filter(o => o.status === 'returned').length;
+    if (totalOrdersEl) totalOrdersEl.innerText = totalOrders;
+    if (pendingEl) pendingEl.innerText = pendingOrders;
+    if (deliveredEl) deliveredEl.innerText = deliveredOrders;
+    if (cancelledEl) cancelledEl.innerText = cancelledOrders;
+    if (returnedEl) returnedEl.innerText = returnedOrders;
     
-    // عرض آخر 5 طلبات مسلمة
-    const lastDelivered = [...delivered].sort((a, b) => {
+    // عرض آخر 10 طلبات (جميع الحالات) في جدول أسفل الصفحة
+    const lastOrders = [...allOrders].sort((a, b) => {
         const dateA = a.createdAt || a.date || '';
         const dateB = b.createdAt || b.date || '';
         return new Date(dateB) - new Date(dateA);
-    }).slice(0, 5);
+    }).slice(0, 10);
     
     const reportsDeliveredOrders = document.getElementById('reports-delivered-orders');
     if (reportsDeliveredOrders) {
-        if (lastDelivered.length === 0) {
-            reportsDeliveredOrders.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">📭 لا توجد طلبات مسلمة بعد</div>';
+        if (lastOrders.length === 0) {
+            reportsDeliveredOrders.innerHTML = '<div style="text-align:center; padding:30px; color:#666; background:#f8f9fa; border-radius:12px;">📭 لا توجد طلبات بعد</div>';
         } else {
             let html = `
                 <style>
-                    .reports-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                    .reports-table th, .reports-table td { padding: 10px; border-bottom: 1px solid #eee; text-align: right; }
-                    .reports-table th { background: #164E63; color: white; }
+                    .reports-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border-radius: 12px; overflow: hidden; }
+                    .reports-table th, .reports-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: right; }
+                    .reports-table th { background: #164E63; color: white; font-weight: 600; }
                     .reports-table tr:hover { background: #f5f5f5; }
+                    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+                    .status-pending { background: #fff3cd; color: #856404; }
+                    .status-delivered { background: #d4edda; color: #155724; }
+                    .status-cancelled { background: #f8d7da; color: #721c24; }
+                    .status-returned { background: #e2e3e5; color: #383d41; }
                 </style>
+                <h4 style="margin: 15px 0 10px 0; color: #164E63;">📋 آخر 10 طلبات</h4>
                 <table class="reports-table">
                     <thead>
                         <tr>
                             <th>رقم الطلب</th>
                             <th>العميل</th>
+                            <th>الهاتف</th>
                             <th>الإجمالي</th>
+                            <th>الحالة</th>
                             <th>التاريخ</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
             
-            for (const order of lastDelivered) {
+            for (const order of lastOrders) {
                 const orderNum = order.orderNumber || order.number || order.orderId || '---';
                 const customerName = order.user?.name || order.userName || '---';
+                const customerPhone = order.user?.phone || order.userPhone || '---';
                 const orderTotal = order.total || 0;
                 const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString('ar-EG') : '---');
+                const statusClass = `status-${order.status || 'pending'}`;
+                const statusText = order.status === 'pending' ? 'معلق' : 
+                                  (order.status === 'delivered' ? 'تم التسليم' : 
+                                  (order.status === 'cancelled' ? 'ملغي' : 'مرتجع'));
                 
                 html += `
                     <tr>
-                        <td>${orderNum}</td>
+                        <td><strong>${orderNum}</strong></td>
                         <td>${customerName}</td>
+                        <td>${customerPhone}</td>
                         <td>${orderTotal} ج.م</td>
-                        <td>${orderDate}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td><small>${orderDate}</small></td>
                     </tr>
                 `;
             }
