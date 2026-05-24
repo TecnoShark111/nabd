@@ -1,46 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  
-  <!-- الصفحة الرئيسية -->
   <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
+    <loc>https://nabd-omega.vercel.app/</loc>
     <priority>1.0</priority>
   </url>
-  
-  <!-- صفحة المنتجات -->
-  <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
-    <priority>0.9</priority>
-  </url>
-  
-  <!-- صفحة سلة التسوق -->
-  <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
-    <priority>0.8</priority>
-  </url>
-  
-  <!-- صفحة حسابي / الملف الشخصي -->
-  <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
-    <priority>0.7</priority>
-  </url>
-  
-  <!-- صفحة تسجيل الدخول -->
-  <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
-    <priority>0.6</priority>
-  </url>
-  
-  <!-- صفحة إتمام الطلب -->
-  <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
-    <priority>0.5</priority>
-  </url>
-  
-  <!-- لوحة تحكم الأدمن -->
-  <url>
-    <loc>https://nabd-ten.vercel.app/</loc>
-    <priority>0.9</priority>
-  </url>
-
 </urlset>
