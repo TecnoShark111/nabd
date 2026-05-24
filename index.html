@@ -2190,10 +2190,8 @@
         
         let currentFirebaseUser = null;
         
-        // ==================== FIREBASE FUNCTIONS ====================
-        // ==================== إعدادات التيليجرام ====================
-const TELEGRAM_BOT_TOKEN = '8931293118:AAHT6Ws1-_QPMQ4YxPExzf9CzHtTOjcJmtE';
-const TELEGRAM_CHAT_ID = '6326397164';
+        const TELEGRAM_BOT_TOKEN = '8931293118:AAHT6Ws1-_QPMQ4YxPExzf9CzHtTOjcJmtE';
+        const TELEGRAM_CHAT_ID = '6326397164';
 
 // دالة إرسال رسالة إلى تيليجرام
 async function sendTelegramMessage(message) {
@@ -2269,12 +2267,14 @@ function formatOrderMessageForTelegram(order) {
     return message;
 }
 
-// ابحث عن هذه الدالة في ملف index.html واستبدلها بالكامل بهذا الكود
-
 async function sendOrderToTelegram(order) {
     if (!order) return false;
     
-    const orderNumber = order.orderNumber || order.number || order.orderId || '---';
+    // استخراج رقم الطلب بشكل نظيف
+    let orderNumber = order.orderNumber || order.number || order.orderId || '';
+    // إزالة أي أحرف غير مرغوب فيها
+    orderNumber = String(orderNumber).replace(/[^0-9a-zA-Z-]/g, '');
+    
     const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString('ar-EG') : new Date().toLocaleString('ar-EG'));
     const orderTotal = order.total || 0;
     
@@ -2309,7 +2309,7 @@ async function sendOrderToTelegram(order) {
     message += `🛒 <b>متجر نبض</b> - أفضل الهوديز والملابس الرجالية\n`;
     message += `\n📌 <b>للتحكم في الطلب، اضغط على الزر المناسب:</b>`;
     
-    // 🔥 هذا هو الجزء المهم - الأزرار!
+    // الأزرار التفاعلية - تأكد من أن callback_data يحتوي على order_ ثم الإجراء ثم رقم الطلب
     const keyboard = [
         [
             { text: "✅ تم التسليم", callback_data: `order_delivered_${orderNumber}` },
@@ -2327,10 +2327,10 @@ async function sendOrderToTelegram(order) {
             chat_id: TELEGRAM_CHAT_ID,
             text: message,
             parse_mode: 'HTML',
-            reply_markup: JSON.stringify({ inline_keyboard: keyboard })  // 🔥 هذا السطر يضيف الأزرار
+            reply_markup: JSON.stringify({ inline_keyboard: keyboard })
         };
         
-        console.log('📤 جاري إرسال رسالة مع أزرار:', payload);
+        console.log('📤 إرسال طلب إلى تيليجرام:', payload);
         
         const response = await fetch(url, {
             method: 'POST',
