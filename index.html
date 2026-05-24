@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>متجر نبض</title>
-    
+    <!-- SEO Meta Tags -->
+<meta name="description" content="متجر نبض - أفضل الهوديز والملابس الرجالية في مصر. جودة عالية وأسعار مميزة">
+<meta name="keywords" content="هوديز, ملابس رجالية, هودي, تيشيرت, نبض, متجر ملابس">
+<meta name="author" content="نبض - Tecno Shark">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://nabd-omega.vercel.app/">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -1597,7 +1602,7 @@
             <div class="search-btn" id="search-btn"><i class="fas fa-search"></i></div>
             <div id="account-btn-container"></div>
         </div>
-        <div class="logo-container" onclick="showSection('home')">
+        <div class="logo-container" onclick="showSection('home'); return false;" style="cursor:pointer;">
             <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="50" cy="50" r="46" fill="#FFFFFF" stroke="#164E63" stroke-width="1.5"/>
                 <text x="50" y="67" text-anchor="middle" fill="#164E63" font-size="28" font-weight="bold" font-family="'Cairo', sans-serif">نبض</text>
@@ -1605,10 +1610,10 @@
             <span class="logo-text">نبض</span>
         </div>
         <div class="header-right">
-            <div class="cart-icon" id="cart-icon">
-                <i class="fas fa-shopping-cart"></i>
-                <span class="cart-count" id="cart-count">0</span>
-            </div>
+         <div class="cart-icon" id="cart-icon" onclick="showSection('cart'); return false;" style="cursor:pointer;">
+    <i class="fas fa-shopping-cart"></i>
+    <span class="cart-count" id="cart-count">0</span>
+</div>
             <div class="lang-toggle" id="lang-toggle">English</div>
         </div>
     </header>
@@ -1616,12 +1621,12 @@
     <div class="overlay" id="overlay"></div>
     <div class="sidebar" id="sidebar">
         <div class="close-btn" id="close-sidebar"><i class="fas fa-times-circle"></i></div>
-        <ul id="sidebar-links">
-            <li><a onclick="showSection('home'); closeSidebar()">الرئيسية</a></li>
-            <li><a onclick="showSection('products'); closeSidebar()">المنتجات</a></li>
-            <li><a onclick="showSection('cart'); closeSidebar()">سلة التسوق</a></li>
-            <li><a onclick="showSection('profile'); closeSidebar()">حسابي</a></li>
-        </ul>
+       <ul id="sidebar-links">
+    <li><a href="/home" onclick="showSection('home'); closeSidebar(); return false;">الرئيسية</a></li>
+    <li><a href="/products" onclick="showSection('products'); closeSidebar(); return false;">المنتجات</a></li>
+    <li><a href="/cart" onclick="showSection('cart'); closeSidebar(); return false;">سلة التسوق</a></li>
+    <li><a href="/profile" onclick="showSection('profile'); closeSidebar(); return false;">حسابي</a></li>
+</ul>
     </div>
     
     <div class="search-overlay" id="search-overlay">
@@ -1792,7 +1797,7 @@
         <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=1200'); background-size: cover; background-position: center; color: white; border-radius: 20px; margin-bottom: 2rem;">
             <h1 id="home-title" style="font-size: 2.2rem;">مرحباً بكم في نبض</h1>
             <p id="home-subtitle" style="font-size: 1rem;">أجود أنواع الهوديز والملابس الرجالية</p>
-            <button class="btn" style="width: auto; margin-top: 0.8rem;" onclick="showSection('products')">تسوق الآن</button>
+           <button class="btn" style="width: auto; margin-top: 0.8rem;" onclick="showSection('products'); return false;">تسوق الآن</button>
         </div>
         <h2 style="text-align: center; font-size: 1.3rem;">منتجات مميزة</h2>
         <div class="products-grid" id="featured-products"></div>
@@ -1804,7 +1809,7 @@
     </section>
     
     <section id="product-detail-full-page" class="section">
-        <button class="btn" onclick="goBackToProducts()" style="width: auto; margin-bottom: 0.8rem;"><i class="fas fa-arrow-right"></i> رجوع للمنتجات</button>
+        <button class="btn" onclick="goBackToProducts(); return false;" style="width: auto; margin-bottom: 0.8rem;"><i class="fas fa-arrow-right"></i> رجوع للمنتجات</button>
         <div id="product-detail-full-content"></div>
     </section>
     
@@ -4089,7 +4094,7 @@ async function sendStatusUpdateToCustomer(customerPhone, orderNumber, newStatus,
             if (!container) return;
             if (currentUser) {
                 const initial = currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U';
-                container.innerHTML = `<div class="user-avatar" onclick="showSection('profile')">${initial}</div>`;
+           container.innerHTML = `<div class="user-avatar" onclick="showSection('profile'); return false;">${initial}</div>`;
             } else {
                 container.innerHTML = `<button class="google-login-btn" onclick="showSection('login')"><i class="fab fa-google"></i><span> تسجيل الدخول</span></button>`;
             }
@@ -4129,30 +4134,39 @@ async function sendStatusUpdateToCustomer(customerPhone, orderNumber, newStatus,
         };
         
         function toggleLanguage() {
-            currentLang = currentLang === 'ar' ? 'en' : 'ar';
-            document.body.classList.toggle('english', currentLang === 'en');
-            const langToggle = document.getElementById('lang-toggle');
-            if (langToggle) langToggle.innerText = translations[currentLang]['lang'];
-            const sidebarLinks = document.getElementById('sidebar-links');
-            if (sidebarLinks) {
-                sidebarLinks.innerHTML = `
-                    <li><a onclick="showSection('home'); closeSidebar()">${currentLang === 'ar' ? 'الرئيسية' : 'Home'}</a></li>
-                    <li><a onclick="showSection('products'); closeSidebar()">${currentLang === 'ar' ? 'المنتجات' : 'Products'}</a></li>
-                    <li><a onclick="showSection('cart'); closeSidebar()">${currentLang === 'ar' ? 'سلة التسوق' : 'Cart'}</a></li>
-                    <li><a onclick="showSection('profile'); closeSidebar()">${currentLang === 'ar' ? 'حسابي' : 'Profile'}</a></li>
-                `;
-            }
-            const homeTitle = document.getElementById('home-title');
-            const homeSubtitle = document.getElementById('home-subtitle');
-            if (homeTitle) homeTitle.innerText = currentLang === 'ar' ? 'مرحباً بكم في نبض' : 'Welcome to Nabd';
-            if (homeSubtitle) homeSubtitle.innerText = currentLang === 'ar' ? 'أجود أنواع الهوديز والملابس الرجالية' : 'The finest hoodies and men\'s clothing';
-            const featuredTitle = document.querySelector('#home h2');
-            if(featuredTitle) featuredTitle.innerText = currentLang === 'ar' ? 'منتجات مميزة' : 'Featured Products';
-            const allProductsTitle = document.querySelector('#products h2');
-            if(allProductsTitle) allProductsTitle.innerText = currentLang === 'ar' ? 'جميع المنتجات' : 'All Products';
-            const cartTitle = document.querySelector('#cart h2');
-            if(cartTitle) cartTitle.innerText = currentLang === 'ar' ? 'سلة التسوق' : 'Shopping Cart';
-        }
+    currentLang = currentLang === 'ar' ? 'en' : 'ar';
+    document.body.classList.toggle('english', currentLang === 'en');
+    const langToggle = document.getElementById('lang-toggle');
+    if (langToggle) langToggle.innerText = translations[currentLang]['lang'];
+    const sidebarLinks = document.getElementById('sidebar-links');
+    if (sidebarLinks) {
+        sidebarLinks.innerHTML = `
+            <li><a href="/home" onclick="showSection('home'); closeSidebar(); return false;">${currentLang === 'ar' ? 'الرئيسية' : 'Home'}</a></li>
+            <li><a href="/products" onclick="showSection('products'); closeSidebar(); return false;">${currentLang === 'ar' ? 'المنتجات' : 'Products'}</a></li>
+            <li><a href="/cart" onclick="showSection('cart'); closeSidebar(); return false;">${currentLang === 'ar' ? 'سلة التسوق' : 'Cart'}</a></li>
+            <li><a href="/profile" onclick="showSection('profile'); closeSidebar(); return false;">${currentLang === 'ar' ? 'حسابي' : 'Profile'}</a></li>
+        `;
+    }
+    const homeTitle = document.getElementById('home-title');
+    const homeSubtitle = document.getElementById('home-subtitle');
+    if (homeTitle) homeTitle.innerText = currentLang === 'ar' ? 'مرحباً بكم في نبض' : 'Welcome to Nabd';
+    if (homeSubtitle) homeSubtitle.innerText = currentLang === 'ar' ? 'أجود أنواع الهوديز والملابس الرجالية' : 'The finest hoodies and men\'s clothing';
+    const featuredTitle = document.querySelector('#home h2');
+    if(featuredTitle) featuredTitle.innerText = currentLang === 'ar' ? 'منتجات مميزة' : 'Featured Products';
+    const allProductsTitle = document.querySelector('#products h2');
+    if(allProductsTitle) allProductsTitle.innerText = currentLang === 'ar' ? 'جميع المنتجات' : 'All Products';
+    const cartTitle = document.querySelector('#cart h2');
+    if(cartTitle) cartTitle.innerText = currentLang === 'ar' ? 'سلة التسوق' : 'Shopping Cart';
+    
+    // حفظ اللغة المفضلة
+    localStorage.setItem('preferredLang', currentLang);
+}
+
+// استعادة اللغة عند تحميل الصفحة
+const savedLang = localStorage.getItem('preferredLang');
+if (savedLang && savedLang !== currentLang) {
+    toggleLanguage();
+}
         
         // ==================== SIDEBAR ====================
         function closeSidebar() {
@@ -6508,6 +6522,38 @@ function showForgotFromLogin() {
     closeLoginStep2Popup();
     showForgotPopup();
 }
+
+// تحويل الروابط إلى روابط حقيقية باستخدام History API
+(function() {
+    // تحديث الرابط في شريط العنوان
+    function updateURL(section) {
+        const newURL = `/${section}`;
+        window.history.pushState({ section: section }, '', newURL);
+    }
+    
+    // تعديل دالة showSection الأصلية
+    const originalShowSection = window.showSection;
+    window.showSection = function(sectionId) {
+        originalShowSection(sectionId);
+        updateURL(sectionId);
+    };
+    
+    // معالجة الضغط على زر الرجوع/التقدم
+    window.addEventListener('popstate', function(event) {
+        if (event.state && event.state.section) {
+            originalShowSection(event.state.section);
+        }
+    });
+    
+    // قراءة الرابط الحالي عند تحميل الصفحة
+    const path = window.location.pathname;
+    if (path && path !== '/') {
+        const section = path.substring(1);
+        if (['home', 'products', 'cart', 'profile', 'login', 'admin-panel'].includes(section)) {
+            setTimeout(() => originalShowSection(section), 100);
+        }
+    }
+})();
 
         // ==================== EVENT LISTENERS ====================
         const hamburger = document.getElementById('hamburger');
