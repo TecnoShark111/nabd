@@ -13,8 +13,7 @@
     
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-   
-    <!-- Firebase SDKs -->
+    
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -3909,7 +3908,7 @@ async function compressImage(file, maxWidth = 1200, maxHeight = 1200) {
                 renderProfileWithOrders();
             }
         }
-        // إصلاح دالة renderProfileWithOrders (جعلها async)
+        // دالة عرض الطلبات في صفحة حسابي (محدثة)
 async function renderProfileWithOrders() {
     const profileInfo = document.getElementById('profile-info');
     if (profileInfo) {
@@ -3941,8 +3940,6 @@ async function renderProfileWithOrders() {
                 userOrders = savedOrders;
                 orders = savedOrders;
                 localStorage.setItem('orders', JSON.stringify(orders));
-            } else if (orders && orders.length > 0) {
-                userOrders = orders.filter(o => o.user?.phone === currentUser?.phone || o.user?.email === currentUser?.email);
             }
         } catch(e) {
             console.log('خطأ في تحميل الطلبات:', e);
@@ -3952,6 +3949,15 @@ async function renderProfileWithOrders() {
         }
     } else if (orders && orders.length > 0) {
         userOrders = orders.filter(o => o.user?.phone === currentUser?.phone || o.user?.email === currentUser?.email);
+    }
+    
+    // ترتيب الطلبات من الأحدث إلى الأقدم
+    if (userOrders.length > 0) {
+        userOrders.sort((a, b) => {
+            const dateA = a.createdAt || a.date || '';
+            const dateB = b.createdAt || b.date || '';
+            return new Date(dateB) - new Date(dateA);
+        });
     }
     
     const ordersList = document.getElementById('user-orders-list');
@@ -3965,16 +3971,62 @@ async function renderProfileWithOrders() {
                 const orderDate = o.date || (o.createdAt ? new Date(o.createdAt).toLocaleString() : '---');
                 const orderStatus = o.status || 'pending';
                 
+                const statusText = orderStatus === 'pending' ? (currentLang === 'ar' ? 'معلق' : 'Pending') : 
+                                  orderStatus === 'delivered' ? (currentLang === 'ar' ? 'تم التسليم' : 'Delivered') : 
+                                  orderStatus === 'cancelled' ? (currentLang === 'ar' ? 'ملغي' : 'Cancelled') : 
+                                  (currentLang === 'ar' ? 'مرتجع' : 'Returned');
+                
                 return `
                     <div class="order-card" onclick="showOrderDetail('${orderNum}')">
                         <div><strong>${orderNum}</strong> - ${orderTotal} ج.م</div>
                         <div>${orderDate}</div>
-                        <div><span class="order-status status-${orderStatus}">${orderStatus === 'pending' ? (currentLang === 'ar' ? 'معلق' : 'Pending') : orderStatus === 'delivered' ? (currentLang === 'ar' ? 'تم التسليم' : 'Delivered') : orderStatus === 'cancelled' ? (currentLang === 'ar' ? 'ملغي' : 'Cancelled') : (currentLang === 'ar' ? 'مرتجع' : 'Returned')}</span></div>
+                        <div><span class="order-status status-${orderStatus}">${statusText}</span></div>
                     </div>
                 `;
             }).join('');
         }
     }
+}
+// دالة إرسال رسالة تأكيد للعميل عبر واتساب
+async function sendStatusUpdateToCustomer(customerPhone, orderNumber, newStatus, statusText) {
+    if (!customerPhone) return;
+    
+    // تنظيف رقم الهاتف
+    let cleanPhone = customerPhone.toString().replace(/\D/g, '');
+    if (cleanPhone.startsWith('0')) {
+        cleanPhone = '20' + cleanPhone.substring(1); // تحويل 011... إلى 2011...
+    }
+    if (!cleanPhone.startsWith('20')) {
+        cleanPhone = '20' + cleanPhone;
+    }
+    
+    const statusMessages = {
+        'delivered': '✅ تم تسليم طلبك بنجاح! شكراً لتسوقك معنا 💙',
+        'cancelled': '❌ تم إلغاء طلبك. يمكنك التواصل معنا للحصول على مزيد من التفاصيل.',
+        'returned': '🔄 تم تسجيل طلبك كمرتجع. سيتم التواصل معك قريباً.'
+    };
+    
+    const message = `🛍️ متجر نبض\n━━━━━━━━━━━━━━━━━━━━\n📋 مرحباً بك،\n\n📦 طلبك رقم #${orderNumber}\n📊 الحالة: ${statusText}\n\n${statusMessages[newStatus] || 'تم تحديث حالة طلبك'}\n━━━━━━━━━━━━━━━━━━━━\n🛒 متجر نبض - أفضل الهوديز والملابس الرجالية`;
+    
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    
+    // فتح واتساب في نافذة جديدة (سيتم فتح التطبيق أو الويب)
+    window.open(whatsappUrl, '_blank');
+    
+    console.log(`📱 تم إرسال إشعار للعميل ${cleanPhone} عن تحديث الطلب ${orderNumber}`);
+    
+    // تسجيل في تيليجرام (للمسؤول)
+    try {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: `📱 تم إرسال إشعار واتساب للعميل:\n📦 الطلب #${orderNumber}\n📊 الحالة: ${statusText}\n👤 رقم الهاتف: ${customerPhone}`,
+                parse_mode: 'HTML'
+            })
+        });
+    } catch(e) {}
 }
         function closeGoogleDataPopup() {
             document.getElementById('google-data-popup')?.classList.remove('show');
@@ -4571,7 +4623,7 @@ async function placeOrder() {
     showSection('home');
 }
    
-   // ==================== معالجة تحديث الحالة من الرابط ====================
+  // معالجة تحديث الحالة من الرابط (بدون رسالة تأكيد)
 async function handleOrderUpdateFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
@@ -4599,43 +4651,57 @@ async function handleOrderUpdateFromURL() {
         return false;
     }
     
-    // طلب تأكيد من المستخدم
-    if (!confirm(`⚠️ هل أنت متأكد من تغيير حالة الطلب #${orderNumber} إلى "${statusNames[status]}"؟`)) {
-        showToast('تم إلغاء العملية', 'info');
-        return true;
-    }
-    
+    // ✅ تم إزالة رسالة التأكيد - يغير الحالة مباشرة
     showToast('⏳ جاري تحديث الطلب...', 'info');
     
     try {
-        // البحث عن الطلب وتحديثه في Firebase
+        let orderData = null;
+        let found = false;
+        
+        // البحث عن الطلب وتحديثه في all_orders
         const snapshot = await database.ref('all_orders').once('value');
         const allOrders = snapshot.val();
-        
-        let found = false;
-        let oldStatus = '';
         
         if (allOrders) {
             for (const key in allOrders) {
                 const order = allOrders[key];
                 const orderNum = order.orderNumber || order.number || order.orderId || '';
                 
-                // مقارنة رقم الطلب بطرق مختلفة
-                if (orderNum === orderNumber || 
-                    orderNum.includes(orderNumber) || 
-                    orderNumber.includes(orderNum)) {
-                    
-                    oldStatus = order.status;
-                    
+                if (orderNum === orderNumber || orderNum.includes(orderNumber) || orderNumber.includes(orderNum)) {
+                    orderData = order;
                     await database.ref(`all_orders/${key}`).update({
                         status: status,
                         updatedAt: new Date().toISOString(),
                         updatedBy: 'url_link'
                     });
-                    
                     found = true;
-                    console.log(`✅ تم تحديث الطلب ${orderNumber} من ${oldStatus} إلى ${status}`);
+                    console.log(`✅ تم تحديث الطلب ${orderNumber} إلى ${status}`);
                     break;
+                }
+            }
+        }
+        
+        // تحديث في مسار المستخدم (مهم جداً لصفحة حسابي)
+        const usersSnapshot = await database.ref('users').once('value');
+        const usersData = usersSnapshot.val();
+        
+        if (usersData) {
+            for (const userId in usersData) {
+                const ordersSnapshot = await database.ref(`users/${userId}/orders`).once('value');
+                const userOrders = ordersSnapshot.val();
+                
+                if (userOrders && Array.isArray(userOrders)) {
+                    const orderIndex = userOrders.findIndex(o => 
+                        o.orderNumber === orderNumber || o.number === orderNumber || o.orderId === orderNumber
+                    );
+                    
+                    if (orderIndex !== -1) {
+                        userOrders[orderIndex].status = status;
+                        userOrders[orderIndex].updatedAt = new Date().toISOString();
+                        await database.ref(`users/${userId}/orders`).set(userOrders);
+                        console.log(`✅ تم تحديث الطلب في user ${userId}`);
+                        break;
+                    }
                 }
             }
         }
@@ -4643,7 +4709,10 @@ async function handleOrderUpdateFromURL() {
         if (found) {
             showToast(`✅ تم تغيير حالة الطلب #${orderNumber} إلى ${statusNames[status]}`, 'success');
             
-            // إرسال تأكيد إلى التيليجرام
+            // 🔥 تحديث صفحة حسابي العميل إذا كانت مفتوحة
+            await renderProfileWithOrders();
+            
+            // إرسال رسالة تأكيد إلى تيليجرام (للمسؤول)
             await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -4654,12 +4723,16 @@ async function handleOrderUpdateFromURL() {
                 })
             });
             
-            // تحديث الواجهات
+            // 📱 إرسال رسالة واتساب للعميل
+            if (orderData && orderData.user && orderData.user.phone) {
+                await sendStatusUpdateToCustomer(orderData.user.phone, orderNumber, status, statusNames[status]);
+            }
+            
+            // تحديث جميع الواجهات
             if (typeof renderAllOrdersInAdmin === 'function') await renderAllOrdersInAdmin();
             if (typeof renderAdminDashboard === 'function') await renderAdminDashboard();
             if (typeof renderReports === 'function') await renderReports();
             if (typeof filterOrders === 'function') await filterOrders();
-            if (typeof renderProfileWithOrders === 'function') await renderProfileWithOrders();
             
         } else {
             showToast(`❌ لم يتم العثور على الطلب #${orderNumber}`, 'error');
