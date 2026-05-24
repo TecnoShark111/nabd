@@ -3334,7 +3334,77 @@ async function resetDailyCounter() {
             // Start listening for real-time product updates
             listenForProductUpdates();
         }
-        
+        // ==================== دوال حفظ واسترجاع البيانات من Firebase ====================
+
+// حفظ المنتجات إلى السحابة
+async function saveProductsToCloud(products) {
+    if (!products) return;
+    try {
+        await database.ref('public_products').set(products);
+        console.log('✅ Products saved to cloud');
+    } catch (error) {
+        console.error('❌ Failed to save products:', error);
+    }
+}
+
+// تحميل المنتجات من السحابة
+async function loadProductsFromCloud() {
+    try {
+        const snapshot = await database.ref('public_products').once('value');
+        const products = snapshot.val();
+        if (products && Array.isArray(products) && products.length > 0) {
+            return products;
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Failed to load products:', error);
+        return null;
+    }
+}
+
+// حفظ سلة المستخدم
+async function saveUserCart(userId, cart) {
+    if (!userId) return;
+    try {
+        await database.ref(`users/${userId}/cart`).set(cart);
+    } catch (error) {
+        console.error('❌ Failed to save cart:', error);
+    }
+}
+
+// تحميل سلة المستخدم
+async function loadUserCart(userId) {
+    if (!userId) return [];
+    try {
+        const snapshot = await database.ref(`users/${userId}/cart`).once('value');
+        const cart = snapshot.val();
+        return cart && Array.isArray(cart) ? cart : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+// حفظ طلبات المستخدم
+async function saveUserOrders(userId, orders) {
+    if (!userId) return;
+    try {
+        await database.ref(`users/${userId}/orders`).set(orders);
+    } catch (error) {
+        console.error('❌ Failed to save orders:', error);
+    }
+}
+
+// تحميل طلبات المستخدم
+async function loadUserOrders(userId) {
+    if (!userId) return [];
+    try {
+        const snapshot = await database.ref(`users/${userId}/orders`).once('value');
+        const orders = snapshot.val();
+        return orders && Array.isArray(orders) ? orders : [];
+    } catch (error) {
+        return [];
+    }
+}
         // ==================== HELPER FUNCTIONS ====================
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
@@ -4416,6 +4486,7 @@ function listenForCartUpdates(userId) {
 async function placeOrder() {
     if (!currentUser) {
         showToast('الرجاء تسجيل الدخول أولاً', 'error');
+        showSection('login');
         return;
     }
     
@@ -4429,7 +4500,7 @@ async function placeOrder() {
     for (const item of cart) {
         const product = products.find(p => p.id === item.id);
         if (!product || !product.sizes || !product.sizes[item.size] || product.sizes[item.size].qty < (item.quantity || 0)) {
-            showToast(`المنتج ${item.name} غير متوفر بالكمية المطلوبة`, 'error');
+            showToast(`⚠️ المنتج ${item.name} غير متوفر بالكمية المطلوبة`, 'error');
             return;
         }
     }
@@ -4444,7 +4515,9 @@ async function placeOrder() {
     
     // حفظ تحديثات المخزون
     localStorage.setItem('products', JSON.stringify(products));
-    await saveProductsToCloud(products);
+    if (typeof saveProductsToCloud === 'function') {
+        await saveProductsToCloud(products);
+    }
     
     const subtotal = cart.reduce((a, i) => a + (i.price || 0) * (i.quantity || 0), 0);
     const orderNumber = 'ORD-' + Date.now();
@@ -4454,9 +4527,9 @@ async function placeOrder() {
         orderId: orderId,
         orderNumber: orderNumber,
         user: { 
-            name: currentUser.name, 
-            phone: currentUser.phone, 
-            email: currentUser.email,
+            name: currentUser.name || 'غير محدد', 
+            phone: currentUser.phone || 'غير محدد', 
+            email: currentUser.email || 'غير محدد',
             address: address 
         }, 
         items: cart.map(i => ({ ...i })), 
@@ -4473,14 +4546,18 @@ async function placeOrder() {
         await saveUserOrders(currentFirebaseUser.uid, userOrders);
     }
     
-    // 🔥 الأهم: حفظ في مسار عام all_orders ليظهر لجميع الأدمن
-    await database.ref('all_orders').push(newOrder);
-        // إرسال إشعار التيليجرام
-    await sendOrderToTelegram(newOrder);
+    // حفظ في مسار عام all_orders
+    try {
+        await database.ref('all_orders').push(newOrder);
+        console.log('✅ تم حفظ الطلب في all_orders');
+    } catch (error) {
+        console.error('❌ فشل حفظ الطلب في all_orders:', error);
+    }
     
-    
-    
-    
+    // إرسال إشعار التيليجرام
+    if (typeof sendOrderToTelegram === 'function') {
+        await sendOrderToTelegram(newOrder);
+    }
     
     // تفريغ السلة
     cart = [];
@@ -6305,95 +6382,7 @@ async function completeLogin() {
         showToast('حدث خطأ في تسجيل الدخول: ' + error.message, 'error');
     }
 }
-// معالجة تحديث الحالة من الرابط
-async function handleOrderUpdateFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const action = urlParams.get('action');
-    const orderNumber = urlParams.get('order');
-    const status = urlParams.get('status');
-    
-    if (action !== 'update' || !orderNumber || !status) {
-        return false;
-    }
-    
-    // إزالة المعاملات من الرابط
-    window.history.replaceState({}, document.title, window.location.pathname);
-    
-    const statusNames = {
-        'delivered': '✅ تم التسليم',
-        'cancelled': '❌ ملغي',
-        'returned': '🔄 مرتجع'
-    };
-    
-    if (!confirm(`⚠️ هل أنت متأكد من تغيير حالة الطلب #${orderNumber} إلى "${statusNames[status]}"؟`)) {
-        showToast('تم إلغاء العملية', 'info');
-        return true;
-    }
-    
-    showToast('⏳ جاري تحديث الطلب...', 'info');
-    
-    try {
-        // البحث عن الطلب وتحديثه
-        const snapshot = await database.ref('all_orders').once('value');
-        const allOrders = snapshot.val();
-        
-        let found = false;
-        if (allOrders) {
-            for (const key in allOrders) {
-                const order = allOrders[key];
-                const orderNum = order.orderNumber || order.number || order.orderId || '';
-                
-                if (orderNum === orderNumber || orderNum.includes(orderNumber) || orderNumber.includes(orderNum)) {
-                    await database.ref(`all_orders/${key}`).update({
-                        status: status,
-                        updatedAt: new Date().toISOString(),
-                        updatedBy: 'url_link'
-                    });
-                    found = true;
-                    break;
-                }
-            }
-        }
-        
-        if (found) {
-            showToast(`✅ تم تغيير حالة الطلب #${orderNumber} إلى ${statusNames[status]}`, 'success');
-            
-            // إرسال تأكيد إلى التيليجرام
-            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: TELEGRAM_CHAT_ID,
-                    text: `✅ تم تغيير حالة الطلب #${orderNumber} إلى ${statusNames[status]}\n\n🕐 ${new Date().toLocaleString('ar-EG')}`,
-                    parse_mode: 'HTML'
-                })
-            });
-            
-            // إعادة تحميل البيانات
-            await renderAllOrdersInAdmin();
-            await renderAdminDashboard();
-            await renderReports();
-            await filterOrders();
-        } else {
-            showToast(`❌ لم يتم العثور على الطلب #${orderNumber}`, 'error');
-        }
-        
-        return true;
-    } catch (error) {
-        console.error('خطأ:', error);
-        showToast('❌ حدث خطأ في تحديث الطلب', 'error');
-        return false;
-    }
-}
 
-// استدعاء الدالة عند تحميل الصفحة
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(handleOrderUpdateFromURL, 1000);
-    });
-} else {
-    setTimeout(handleOrderUpdateFromURL, 1000);
-}
 // فتح نافذة إنشاء حساب جديد من نافذة تسجيل الدخول
 function showRegisterFromLogin() {
     closeLoginStep1Popup();
