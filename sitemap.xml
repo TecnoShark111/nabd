@@ -1,20 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
-  <!-- ==================== الصفحات الرئيسية الثابتة ==================== -->
-  
-  <!-- الصفحة الرئيسية (Home) -->
+  <!-- الصفحة الرئيسية -->
   <url>
     <loc>https://nabd-omega.vercel.app/</loc>
     <lastmod>2026-05-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://nabd-omega.vercel.app/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://nabd-omega.vercel.app/?lang=en" />
   </url>
   
-  <!-- صفحة المنتجات (Products) -->
+  <!-- صفحة المنتجات -->
   <url>
     <loc>https://nabd-omega.vercel.app/#products</loc>
     <lastmod>2026-05-24</lastmod>
@@ -22,7 +17,7 @@
     <priority>0.9</priority>
   </url>
   
-  <!-- صفحة سلة التسوق (Cart) -->
+  <!-- صفحة سلة التسوق -->
   <url>
     <loc>https://nabd-omega.vercel.app/#cart</loc>
     <lastmod>2026-05-24</lastmod>
@@ -30,7 +25,7 @@
     <priority>0.6</priority>
   </url>
   
-  <!-- صفحة حسابي / الملف الشخصي (Profile) -->
+  <!-- صفحة الملف الشخصي -->
   <url>
     <loc>https://nabd-omega.vercel.app/#profile</loc>
     <lastmod>2026-05-24</lastmod>
@@ -38,7 +33,7 @@
     <priority>0.5</priority>
   </url>
   
-  <!-- صفحة تسجيل الدخول (Login) -->
+  <!-- صفحة تسجيل الدخول -->
   <url>
     <loc>https://nabd-omega.vercel.app/#login</loc>
     <lastmod>2026-05-24</lastmod>
@@ -46,53 +41,23 @@
     <priority>0.4</priority>
   </url>
   
-  <!-- صفحة لوحة تحكم الأدمن (Admin Panel) -->
+  <!-- صفحة لوحة التحكم -->
   <url>
     <loc>https://nabd-omega.vercel.app/#admin-panel</loc>
     <lastmod>2026-05-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
-
-  <!-- ==================== صفحات تفاصيل المنتجات (ديناميكية) ==================== -->
-  <!-- ملاحظة: بما أن الروابط تعتمد على أرقام تعريف المنتجات (ID) داخل الموقع،
-       يتم إدراجها كروابط من نوع hash مع معرّف المنتج. 
-       في حال كان لديك منتجات جديدة، يمكن إضافة روابط مشابهة -->
   
+  <!-- صفحة تفاصيل المنتج -->
   <url>
     <loc>https://nabd-omega.vercel.app/#product-detail-full-page</loc>
     <lastmod>2026-05-24</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
-
-  <!-- ==================== روابط واجهة برمجة التطبيقات (API) للتحكم بالطلبات ==================== -->
-  <!-- هذه الروابط تُستخدم لتحديث حالة الطلبات (تسليم، إلغاء، مرتجع) وتنفذ خلف الكواليس -->
   
-  <url>
-    <loc>https://nabd-omega.vercel.app/?action=update&order=ORD-EXAMPLE&status=delivered</loc>
-    <lastmod>2026-05-24</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.1</priority>
-  </url>
-  
-  <url>
-    <loc>https://nabd-omega.vercel.app/?action=update&order=ORD-EXAMPLE&status=cancelled</loc>
-    <lastmod>2026-05-24</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.1</priority>
-  </url>
-  
-  <url>
-    <loc>https://nabd-omega.vercel.app/?action=update&order=ORD-EXAMPLE&status=returned</loc>
-    <lastmod>2026-05-24</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.1</priority>
-  </url>
-  
-  <!-- ==================== صفحات إضافية (إن وجدت) ==================== -->
-  
-  <!-- صفحة إتمام الطلب (Checkout) - متاحة فقط للمستخدمين المسجلين -->
+  <!-- صفحة إتمام الطلب -->
   <url>
     <loc>https://nabd-omega.vercel.app/#checkout</loc>
     <lastmod>2026-05-24</lastmod>
@@ -100,7 +65,7 @@
     <priority>0.3</priority>
   </url>
   
-  <!-- صفحة تفاصيل الطلب (Order Detail) -->
+  <!-- صفحة تفاصيل الطلب -->
   <url>
     <loc>https://nabd-omega.vercel.app/#order-detail-page</loc>
     <lastmod>2026-05-24</lastmod>
