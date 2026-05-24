@@ -1884,7 +1884,7 @@
             <div class="admin-tab active" onclick="showAdminTab('dashboard')">Dashboard</div>
             <div class="admin-tab" onclick="showAdminTab('orders')">إدارة الطلبات</div>
             <div class="admin-tab" onclick="showAdminTab('inventory')">المخزون</div>
-            <div class="admin-tab" onclick="showAdminTab('reports')">التقارير</div>
+            
         </div>
         
         <div id="admin-dashboard" class="admin-section active">
@@ -6057,49 +6057,34 @@ if (editProductForm) {
     });
 }
 
-    // ==================== دالة التقارير النهائية (نسخة واحدة فقط) ====================
-async function renderReports() {
+   async function renderReports() {
     console.log('📊 بدء تحميل التقارير...');
     
-    // التحقق من Firebase
-    if (typeof database === 'undefined' || !database) {
-        console.error('❌ Firebase غير مهيأ');
-        const container = document.getElementById('reports-delivered-orders');
-        if (container) {
-            container.innerHTML = `
-                <div style="text-align:center; padding:40px;">
-                    <i class="fas fa-exclamation-triangle" style="font-size:48px; color:#dc3545;"></i>
-                    <p>⚠️ قاعدة البيانات غير متصلة</p>
-                    <button class="btn" onclick="renderReports()" style="margin-top:10px;">إعادة المحاولة</button>
-                </div>
-            `;
-        }
-        return;
-    }
-    
     try {
-        // جلب الطلبات
-        let allOrders = [];
-        
-        // من all_orders
+        // جلب الطلبات من all_orders
         const snapshot = await database.ref('all_orders').once('value');
         const data = snapshot.val();
         
+        let allOrders = [];
         if (data) {
             allOrders = Object.values(data);
-            console.log('✅ تم جلب', allOrders.length, 'طلب');
         }
         
-        // عرض إحصائيات
+        console.log('✅ تم جلب', allOrders.length, 'طلب');
+        
+        // إذا كان هناك 14 طلب، تأكد من ظهورهم في Console
+        if (allOrders.length > 0) {
+            console.log('📦 أول طلب:', allOrders[0]);
+        }
+        
+        // حساب الإحصائيات
         const pending = allOrders.filter(o => o.status === 'pending').length;
         const delivered = allOrders.filter(o => o.status === 'delivered').length;
         const cancelled = allOrders.filter(o => o.status === 'cancelled').length;
         const returned = allOrders.filter(o => o.status === 'returned').length;
+        const totalSales = allOrders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + (o.total || 0), 0);
         
-        const totalSales = allOrders.filter(o => o.status === 'delivered')
-            .reduce((sum, o) => sum + (o.total || 0), 0);
-        
-        // تحديث العناصر
+        // تحديث العناصر - تأكد من وجودها
         const elements = {
             'reports-total-sales': totalSales.toFixed(2),
             'reports-total-profit': (totalSales * 0.35).toFixed(2),
@@ -6112,30 +6097,30 @@ async function renderReports() {
         
         for (const [id, value] of Object.entries(elements)) {
             const el = document.getElementById(id);
-            if (el) el.innerText = value;
+            if (el) {
+                el.innerText = value;
+                console.log(`✅ تم تحديث ${id} = ${value}`);
+            } else {
+                console.error(`❌ العنصر ${id} غير موجود في الصفحة`);
+            }
         }
         
         // عرض جدول الطلبات
         const container = document.getElementById('reports-delivered-orders');
-        if (!container) return;
-        
-        if (allOrders.length === 0) {
-            container.innerHTML = `
-                <div style="text-align:center; padding:40px; background:#f8f9fa; border-radius:12px;">
-                    <i class="fas fa-shopping-bag" style="font-size:48px; color:#E5C97B;"></i>
-                    <p>📭 لا توجد طلبات بعد</p>
-                    <p style="font-size:12px; color:#999;">عند إضافة طلبات جديدة، ستظهر هنا تلقائياً</p>
-                </div>
-            `;
+        if (!container) {
+            console.error('❌ حاوية التقارير غير موجودة');
             return;
         }
         
-        // ترتيب وتحديد آخر 10 طلبات
-        const lastOrders = [...allOrders]
-            .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0))
-            .slice(0, 10);
+        if (allOrders.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:40px;">📭 لا توجد طلبات</div>';
+            return;
+        }
         
-        let tableHtml = `
+        // عرض آخر 10 طلبات
+        const lastOrders = allOrders.slice(0, 10);
+        
+        let html = `
             <style>
                 .reports-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 12px; overflow: hidden; }
                 .reports-table th, .reports-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: right; }
@@ -6145,11 +6130,8 @@ async function renderReports() {
                 .status-delivered { background: #d4edda; color: #155724; }
                 .status-cancelled { background: #f8d7da; color: #721c24; }
                 .status-returned { background: #e2e3e5; color: #383d41; }
-                @media (max-width: 768px) {
-                    .reports-table th, .reports-table td { padding: 8px; font-size: 12px; }
-                }
             </style>
-            <h4 style="margin: 20px 0 10px 0;">📋 آخر ${lastOrders.length} طلبات</h4>
+            <h4 style="margin: 20px 0 10px 0;">📋 آخر الطلبات</h4>
             <div style="overflow-x: auto;">
                 <table class="reports-table">
                     <thead><tr><th>#</th><th>رقم الطلب</th><th>العميل</th><th>الهاتف</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th></tr></thead>
@@ -6161,25 +6143,27 @@ async function renderReports() {
             const customerName = order.user?.name || '---';
             const customerPhone = order.user?.phone || '---';
             const statusText = {
-                'pending': 'معلق', 'delivered': 'تم التسليم', 
+                'pending': 'معلق', 'delivered': 'تم التسليم',
                 'cancelled': 'ملغي', 'returned': 'مرتجع'
             }[order.status] || 'معلق';
+            const statusClass = `status-${order.status || 'pending'}`;
+            const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '---');
             
-            tableHtml += `
+            html += `
                 <tr>
                     <td>${idx + 1}</td>
                     <td><strong>${orderNum}</strong></td>
                     <td>${customerName}</td>
                     <td>${customerPhone}</td>
-                    <td>${order.total || 0} ج.م</td>
-                    <td><span class="status-badge status-${order.status || 'pending'}">${statusText}</span></td>
-                    <td><small>${order.date || (order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '---')}</small></td>
+                    <td>${order.total || 0} ج.م</div></td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td><small>${orderDate}</small></td>
                 </tr>
             `;
         });
         
-        tableHtml += `</tbody></table></div>`;
-        container.innerHTML = tableHtml;
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
         
         console.log('✅ تم تحديث التقارير بنجاح');
         
@@ -6190,7 +6174,7 @@ async function renderReports() {
             container.innerHTML = `
                 <div style="text-align:center; padding:40px; background:#f8f9fa; border-radius:12px;">
                     <i class="fas fa-exclamation-triangle" style="font-size:48px; color:#dc3545;"></i>
-                    <p>❌ حدث خطأ: ${error.message}</p>
+                    <p>❌ خطأ: ${error.message}</p>
                     <button class="btn" onclick="renderReports()" style="margin-top:10px;">إعادة المحاولة</button>
                 </div>
             `;
