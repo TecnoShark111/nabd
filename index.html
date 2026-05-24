@@ -2270,13 +2270,19 @@ function formatOrderMessageForTelegram(order) {
 async function sendOrderToTelegram(order) {
     if (!order) return false;
     
-    // استخراج رقم الطلب بشكل نظيف
     let orderNumber = order.orderNumber || order.number || order.orderId || '';
-    // إزالة أي أحرف غير مرغوب فيها
     orderNumber = String(orderNumber).replace(/[^0-9a-zA-Z-]/g, '');
     
     const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString('ar-EG') : new Date().toLocaleString('ar-EG'));
     const orderTotal = order.total || 0;
+    
+    // رابط موقعك
+    const SITE_URL = 'https://nabd-omega.vercel.app';
+    
+    // إنشاء روابط التحكم (بدون أزرار تفاعلية،直接用 روابط)
+    const deliveredLink = `${SITE_URL}?action=update&order=${orderNumber}&status=delivered`;
+    const cancelledLink = `${SITE_URL}?action=update&order=${orderNumber}&status=cancelled`;
+    const returnedLink = `${SITE_URL}?action=update&order=${orderNumber}&status=returned`;
     
     let message = `🛍️ <b>🧡 طلب جديد من متجر نبض 🧡</b>\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
@@ -2307,19 +2313,11 @@ async function sendOrderToTelegram(order) {
     message += `💰 <b>إجمالي الطلب:</b> ${orderTotal} ج.م\n`;
     message += `━━━━━━━━━━━━━━━━━━━━\n`;
     message += `🛒 <b>متجر نبض</b> - أفضل الهوديز والملابس الرجالية\n`;
-    message += `\n📌 <b>للتحكم في الطلب، اضغط على الزر المناسب:</b>`;
-    
-    // الأزرار التفاعلية - تأكد من أن callback_data يحتوي على order_ ثم الإجراء ثم رقم الطلب
-    const keyboard = [
-        [
-            { text: "✅ تم التسليم", callback_data: `order_delivered_${orderNumber}` },
-            { text: "❌ إلغاء الطلب", callback_data: `order_cancelled_${orderNumber}` }
-        ],
-        [
-            { text: "🔄 مرتجع", callback_data: `order_returned_${orderNumber}` },
-            { text: "📋 تفاصيل", callback_data: `order_details_${orderNumber}` }
-        ]
-    ];
+    message += `━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `📌 <b>للتحكم في الطلب، اضغط على الرابط المناسب:</b>\n\n`;
+    message += `✅ <a href="${deliveredLink}">تأكيد تسليم الطلب</a>\n`;
+    message += `❌ <a href="${cancelledLink}">إلغاء الطلب</a>\n`;
+    message += `🔄 <a href="${returnedLink}">تسجيل كمرتجع</a>`;
     
     try {
         const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
@@ -2327,10 +2325,8 @@ async function sendOrderToTelegram(order) {
             chat_id: TELEGRAM_CHAT_ID,
             text: message,
             parse_mode: 'HTML',
-            reply_markup: JSON.stringify({ inline_keyboard: keyboard })
+            disable_web_page_preview: false
         };
-        
-        console.log('📤 إرسال طلب إلى تيليجرام:', payload);
         
         const response = await fetch(url, {
             method: 'POST',
@@ -2338,31 +2334,12 @@ async function sendOrderToTelegram(order) {
             body: JSON.stringify(payload)
         });
         
-        const result = await response.json();
-        console.log('📥 رد التيليجرام:', result);
-        
-        if (result.ok) {
-            console.log('✅ تم إرسال الطلب مع الأزرار بنجاح');
-            return true;
-        } else {
-            console.error('❌ فشل الإرسال:', result.description);
-            return false;
-        }
+        return response.ok;
     } catch (error) {
-        console.error('❌ خطأ في إرسال رسالة التيليجرام:', error);
+        console.error('خطأ:', error);
         return false;
     }
 }
-        // Save products to cloud
-        async function saveProductsToCloud(products) {
-            if (!products) return;
-            try {
-                await database.ref('public_products').set(products);
-                console.log('✅ Products saved to cloud');
-            } catch (error) {
-                console.error('❌ Failed to save products:', error);
-            }
-        }
         
         // Load products from cloud
         async function loadProductsFromCloud() {
@@ -5791,187 +5768,7 @@ if (editProductForm) {
         }
     });
 }
-// ==================== الدوال المفقودة ====================
 
-// دالة الرجوع إلى الملف الشخصي من صفحة تفاصيل الطلب
-function goBackToProfile() {
-    showSection('profile');
-}
-
-// دالة الرجوع إلى المنتجات
-function goBackToProducts() {
-    showSection('products');
-}
-
-// دالة تحديث حالة الطلب بواسطة ID (لأزرار لوحة التحكم)
-async function updateOrderStatusById(orderId, newStatus) {
-    if (!orderId) {
-        showToast('❌ لا يمكن تحديد الطلب', 'error');
-        return;
-    }
-    
-    try {
-        // البحث عن الطلب في all_orders
-        const snapshot = await database.ref('all_orders').once('value');
-        const allOrders = snapshot.val();
-        
-        let found = false;
-        if (allOrders) {
-            for (const key in allOrders) {
-                const order = allOrders[key];
-                if (order.orderId === orderId || order.orderNumber === orderId || order.number === orderId) {
-                    await database.ref(`all_orders/${key}`).update({
-                        status: newStatus,
-                        updatedAt: new Date().toISOString(),
-                        updatedBy: 'admin_panel'
-                    });
-                    found = true;
-                    console.log(`✅ تم تحديث الطلب ${orderId} إلى ${newStatus}`);
-                    break;
-                }
-            }
-        }
-        
-        if (found) {
-            const statusText = newStatus === 'delivered' ? 'تم التسليم' : (newStatus === 'cancelled' ? 'ملغي' : 'مرتجع');
-            showToast(`✅ تم تغيير حالة الطلب إلى ${statusText}`, 'success');
-            
-            // إعادة تحميل البيانات
-            await renderAllOrdersInAdmin();
-            await renderAdminDashboard();
-            await renderReports();
-            await filterOrders();
-        } else {
-            showToast('❌ لم يتم العثور على الطلب', 'error');
-        }
-    } catch (error) {
-        console.error('خطأ:', error);
-        showToast('❌ حدث خطأ', 'error');
-    }
-}
-
-// دالة عرض تفاصيل الطلب (إذا كانت مفقودة)
-async function showOrderDetail(orderNumber) {
-    try {
-        const snapshot = await database.ref('all_orders').once('value');
-        const allOrders = snapshot.val();
-        
-        let order = null;
-        if (allOrders) {
-            for (const key in allOrders) {
-                const o = allOrders[key];
-                if (o.orderNumber === orderNumber || o.number === orderNumber || o.orderId === orderNumber) {
-                    order = o;
-                    break;
-                }
-            }
-        }
-        
-        if (order) {
-            displayOrderDetail(order);
-        } else {
-            showToast('❌ لم يتم العثور على الطلب', 'error');
-        }
-    } catch (error) {
-        console.error('خطأ:', error);
-        showToast('❌ حدث خطأ', 'error');
-    }
-}
-
-// دالة تصدير التقرير الكامل
-function exportFullReportPDF() {
-    const win = window.open('', '_blank');
-    win.document.write(`
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>تقرير نبض</title>
-            <style>
-                body { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; }
-                table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-                th { background: #164E63; color: white; }
-                h1, h2 { color: #164E63; }
-            </style>
-        </head>
-        <body>
-            <h1>تقرير نبض الشامل</h1>
-            <div>
-                <h3>إجمالي المبيعات: ${document.getElementById('reports-total-sales')?.innerText || 0}</h3>
-                <h3>إجمالي الأرباح: ${document.getElementById('reports-total-profit')?.innerText || 0}</h3>
-                <h3>عدد الطلبات: ${document.getElementById('reports-total-orders')?.innerText || 0}</h3>
-            </div>
-            <h2>آخر الطلبات</h2>
-            ${document.getElementById('reports-delivered-orders')?.innerHTML || '<p>لا توجد طلبات</p>'}
-        </body>
-        </html>
-    `);
-    win.document.close();
-    win.print();
-}
-
-// دالة تصدير الطلبات إلى PDF
-function exportOrdersPDF() {
-    const win = window.open('', '_blank');
-    win.document.write(`
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>الطلبات</title>
-            <style>
-                body { font-family: 'Cairo', sans-serif; direction: rtl; padding: 20px; }
-                table { border-collapse: collapse; width: 100%; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-                th { background: #164E63; color: white; }
-            </style>
-        </head>
-        <body>
-            <h1>الطلبات</h1>
-            ${document.getElementById('orders-table-container')?.innerHTML || '<p>لا توجد طلبات</p>'}
-        </body>
-        </html>
-    `);
-    win.document.close();
-    win.print();
-}
-
-// تحديث دالة displayOrderDetail إذا كانت مفقودة
-function displayOrderDetail(order) {
-    const detailDiv = document.getElementById('order-detail-full');
-    if (!detailDiv) return;
-    
-    if (!order) {
-        detailDiv.innerHTML = '<div class="product-detail-full-page"><p style="color:red;">الطلب غير موجود</p></div>';
-        showSection('order-detail-page');
-        return;
-    }
-    
-    const orderNum = order.orderNumber || order.number || '---';
-    const orderTotal = order.total || 0;
-    const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString() : '---');
-    const orderStatus = order.status || 'pending';
-    
-    detailDiv.innerHTML = `
-        <div class="product-detail-full-page">
-            <h2>📋 تفاصيل الطلب #${orderNum}</h2>
-            <p><strong>📅 التاريخ:</strong> ${orderDate}</p>
-            <p><strong>📊 الحالة:</strong> <span class="order-status status-${orderStatus}">${
-                orderStatus === 'pending' ? '⏳ معلق' : 
-                orderStatus === 'delivered' ? '✅ تم التسليم' : 
-                orderStatus === 'cancelled' ? '❌ ملغي' : '🔄 مرتجع'
-            }</span></p>
-            <h3>📦 المنتجات:</h3>
-            ${order.items ? order.items.map(i => `<p>• ${i.name} (${i.size}/${i.color}) x${i.quantity} = ${(i.price || 0) * (i.quantity || 0)} ج.م</p>`).join('') : '<p>لا توجد منتجات</p>'}
-            <h3>👤 بيانات العميل:</h3>
-            <p>${order.user?.name || '---'}<br>${order.user?.phone || '---'}<br>${order.user?.address || '---'}</p>
-            <h3>💰 الإجمالي: ${orderTotal} ج.م</h3>
-            <button class="btn" onclick="showSection('profile')" style="width:auto; margin-top:1rem;">🔙 رجوع</button>
-        </div>
-    `;
-    showSection('order-detail-page');
-}
-
-console.log('✅ جميع الدوال المفقودة تم إضافتها بنجاح');
      // إصلاح نهائي لدالة renderReports
 async function renderReports() {
     console.log('📊 جاري تحميل التقارير...');
