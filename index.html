@@ -6305,7 +6305,95 @@ async function completeLogin() {
         showToast('حدث خطأ في تسجيل الدخول: ' + error.message, 'error');
     }
 }
+// معالجة تحديث الحالة من الرابط
+async function handleOrderUpdateFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+    const orderNumber = urlParams.get('order');
+    const status = urlParams.get('status');
+    
+    if (action !== 'update' || !orderNumber || !status) {
+        return false;
+    }
+    
+    // إزالة المعاملات من الرابط
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    const statusNames = {
+        'delivered': '✅ تم التسليم',
+        'cancelled': '❌ ملغي',
+        'returned': '🔄 مرتجع'
+    };
+    
+    if (!confirm(`⚠️ هل أنت متأكد من تغيير حالة الطلب #${orderNumber} إلى "${statusNames[status]}"؟`)) {
+        showToast('تم إلغاء العملية', 'info');
+        return true;
+    }
+    
+    showToast('⏳ جاري تحديث الطلب...', 'info');
+    
+    try {
+        // البحث عن الطلب وتحديثه
+        const snapshot = await database.ref('all_orders').once('value');
+        const allOrders = snapshot.val();
+        
+        let found = false;
+        if (allOrders) {
+            for (const key in allOrders) {
+                const order = allOrders[key];
+                const orderNum = order.orderNumber || order.number || order.orderId || '';
+                
+                if (orderNum === orderNumber || orderNum.includes(orderNumber) || orderNumber.includes(orderNum)) {
+                    await database.ref(`all_orders/${key}`).update({
+                        status: status,
+                        updatedAt: new Date().toISOString(),
+                        updatedBy: 'url_link'
+                    });
+                    found = true;
+                    break;
+                }
+            }
+        }
+        
+        if (found) {
+            showToast(`✅ تم تغيير حالة الطلب #${orderNumber} إلى ${statusNames[status]}`, 'success');
+            
+            // إرسال تأكيد إلى التيليجرام
+            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TELEGRAM_CHAT_ID,
+                    text: `✅ تم تغيير حالة الطلب #${orderNumber} إلى ${statusNames[status]}\n\n🕐 ${new Date().toLocaleString('ar-EG')}`,
+                    parse_mode: 'HTML'
+                })
+            });
+            
+            // إعادة تحميل البيانات
+            await renderAllOrdersInAdmin();
+            await renderAdminDashboard();
+            await renderReports();
+            await filterOrders();
+        } else {
+            showToast(`❌ لم يتم العثور على الطلب #${orderNumber}`, 'error');
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('خطأ:', error);
+        showToast('❌ حدث خطأ في تحديث الطلب', 'error');
+        return false;
+    }
+}
 
+// استدعاء الدالة عند تحميل الصفحة
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(handleOrderUpdateFromURL, 1000);
+    });
+} else {
+    setTimeout(handleOrderUpdateFromURL, 1000);
+}
 // فتح نافذة إنشاء حساب جديد من نافذة تسجيل الدخول
 function showRegisterFromLogin() {
     closeLoginStep1Popup();
