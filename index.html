@@ -6029,127 +6029,190 @@ if (editProductForm) {
     });
 }
 
-     // إصلاح نهائي لدالة renderReports
+    // ==================== دالة التقارير المُصلحة بالكامل ====================
 async function renderReports() {
-    console.log('📊 جاري تحميل التقارير...');
+    console.log('📊 بدء تحميل التقارير...');
     
-    const allOrders = await getAllOrdersFromAllUsers();
-    console.log('📦 عدد الطلبات المستلمة:', allOrders.length);
+    // التحقق من وجود Firebase
+    if (typeof database === 'undefined' || !database) {
+        console.error('❌ Firebase Database غير مهيأة');
+        showErrorInReports('❌ قاعدة البيانات غير متصلة. يرجى تحديث الصفحة.');
+        return;
+    }
     
-    // عرض إحصائيات عامة (من جميع الطلبات وليس فقط المسلمة)
-    const totalOrders = allOrders.length;
-    const pendingOrders = allOrders.filter(o => o.status === 'pending').length;
-    const deliveredOrders = allOrders.filter(o => o.status === 'delivered').length;
-    const cancelledOrders = allOrders.filter(o => o.status === 'cancelled').length;
-    const returnedOrders = allOrders.filter(o => o.status === 'returned').length;
-    
-    // حساب إجمالي المبيعات (من الطلبات المسلمة فقط)
-    const delivered = allOrders.filter(o => o.status === 'delivered');
-    const totalSales = delivered.reduce((a, o) => a + (o.total || 0), 0);
-    
-    // حساب الأرباح
-    let totalProfit = 0;
-    for (const order of delivered) {
-        if (order.items && Array.isArray(order.items)) {
-            for (const item of order.items) {
-                const product = products.find(p => p.id == item.id);
-                if (product) {
-                    const profit = ((product.price || 0) - (product.cost || 0)) * (item.quantity || 0);
-                    totalProfit += profit;
+    try {
+        // محاولة جلب الطلبات من Firebase
+        let allOrders = [];
+        
+        // الطريقة الأولى: من all_orders
+        const allOrdersSnapshot = await database.ref('all_orders').once('value');
+        const allOrdersData = allOrdersSnapshot.val();
+        
+        if (allOrdersData) {
+            allOrders = Object.values(allOrdersData);
+            console.log('✅ تم جلب', allOrders.length, 'طلب من all_orders');
+        }
+        
+        // الطريقة الثانية: من مسار المستخدمين (احتياطي)
+        if (allOrders.length === 0) {
+            const usersSnapshot = await database.ref('users').once('value');
+            const usersData = usersSnapshot.val();
+            
+            if (usersData) {
+                for (const userId in usersData) {
+                    if (usersData[userId] && usersData[userId].orders) {
+                        const userOrders = usersData[userId].orders;
+                        if (Array.isArray(userOrders)) {
+                            allOrders.push(...userOrders);
+                        }
+                    }
+                }
+                console.log('✅ تم جلب', allOrders.length, 'طلب من مسار المستخدمين');
+            }
+        }
+        
+        // إذا كانت قاعدة البيانات فارغة تماماً، اعرض بيانات تجريبية
+        if (allOrders.length === 0) {
+            console.log('⚠️ لا توجد طلبات، عرض بيانات تجريبية');
+            showMockReports();
+            return;
+        }
+        
+        // حساب الإحصائيات
+        const pendingOrders = allOrders.filter(o => o.status === 'pending').length;
+        const deliveredOrders = allOrders.filter(o => o.status === 'delivered').length;
+        const cancelledOrders = allOrders.filter(o => o.status === 'cancelled').length;
+        const returnedOrders = allOrders.filter(o => o.status === 'returned').length;
+        
+        const totalSales = allOrders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + (o.total || 0), 0);
+        
+        // حساب الأرباح (إذا كان لديك بيانات التكلفة)
+        let totalProfit = 0;
+        for (const order of allOrders) {
+            if (order.status === 'delivered' && order.items) {
+                for (const item of order.items) {
+                    const product = products?.find(p => p.id == item.id);
+                    if (product && product.cost) {
+                        totalProfit += ((item.price || 0) - (product.cost || 0)) * (item.quantity || 0);
+                    } else {
+                        // تقدير الربح 40% إذا لم تتوفر بيانات التكلفة
+                        totalProfit += ((item.price || 0) * 0.4) * (item.quantity || 0);
+                    }
                 }
             }
         }
+        
+        // تحديث واجهة الإحصائيات
+        updateStatElement('reports-total-sales', totalSales.toFixed(2));
+        updateStatElement('reports-total-profit', totalProfit.toFixed(2));
+        updateStatElement('reports-total-orders', allOrders.length);
+        updateStatElement('reports-pending', pendingOrders);
+        updateStatElement('reports-delivered', deliveredOrders);
+        updateStatElement('reports-cancelled', cancelledOrders);
+        updateStatElement('reports-returned', returnedOrders);
+        
+        // عرض جدول آخر الطلبات
+        const lastOrders = [...allOrders]
+            .sort((a, b) => {
+                const dateA = a.createdAt || a.date || '';
+                const dateB = b.createdAt || b.date || '';
+                return new Date(dateB) - new Date(dateA);
+            })
+            .slice(0, 10);
+        
+        renderOrdersTableInReports(lastOrders);
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل التقارير:', error);
+        showErrorInReports('حدث خطأ في تحميل البيانات: ' + error.message);
+    }
+}
+
+// دوال مساعدة
+function updateStatElement(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = value;
+}
+
+function showErrorInReports(message) {
+    const container = document.getElementById('reports-delivered-orders');
+    if (container) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:50px; background:#f8f9fa; border-radius:12px;">
+                <i class="fas fa-exclamation-triangle" style="font-size:48px; color:#dc3545; margin-bottom:15px;"></i>
+                <p style="font-size:16px; color:#666;">${message}</p>
+                <button class="btn" onclick="renderReports()" style="margin-top:15px;">🔄 إعادة المحاولة</button>
+            </div>
+        `;
+    }
+}
+
+function showMockReports() {
+    // بيانات تجريبية للعرض
+    updateStatElement('reports-total-sales', '12,500');
+    updateStatElement('reports-total-profit', '5,200');
+    updateStatElement('reports-total-orders', '42');
+    updateStatElement('reports-pending', '5');
+    updateStatElement('reports-delivered', '30');
+    updateStatElement('reports-cancelled', '5');
+    updateStatElement('reports-returned', '2');
+    
+    const mockOrders = [
+        { number: 'ORD-1001', customer: 'أحمد محمد', phone: '01123456789', total: 850, status: 'delivered', date: '2024-01-15' },
+        { number: 'ORD-1002', customer: 'محمود علي', phone: '01234567890', total: 1200, status: 'pending', date: '2024-01-14' },
+        { number: 'ORD-1003', customer: 'كريم حسن', phone: '01567890123', total: 450, status: 'cancelled', date: '2024-01-13' },
+    ];
+    
+    renderOrdersTableInReports(mockOrders, true);
+}
+
+function renderOrdersTableInReports(orders, isMock = false) {
+    const container = document.getElementById('reports-delivered-orders');
+    if (!container) return;
+    
+    if (!orders || orders.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:40px;"><i class="fas fa-shopping-bag" style="font-size:48px; color:#E5C97B;"></i><p>📭 لا توجد طلبات بعد</p></div>`;
+        return;
     }
     
-    // تحديث الإحصائيات في الصفحة
-    const totalSalesEl = document.getElementById('reports-total-sales');
-    const totalProfitEl = document.getElementById('reports-total-profit');
-    const totalOrdersEl = document.getElementById('reports-total-orders');
-    const pendingEl = document.getElementById('reports-pending');
-    const deliveredEl = document.getElementById('reports-delivered');
-    const cancelledEl = document.getElementById('reports-cancelled');
-    const returnedEl = document.getElementById('reports-returned');
+    let html = `
+        <style>
+            .reports-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+            .reports-table th, .reports-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: right; }
+            .reports-table th { background: #164E63; color: white; font-weight: 600; }
+            .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+            .status-pending { background: #fff3cd; color: #856404; }
+            .status-delivered { background: #d4edda; color: #155724; }
+            .status-cancelled { background: #f8d7da; color: #721c24; }
+            .status-returned { background: #e2e3e5; color: #383d41; }
+        </style>
+        ${isMock ? '<div style="background:#fff3cd; padding:8px; border-radius:8px; margin-bottom:10px;"><i class="fas fa-info-circle"></i> عرض بيانات تجريبية - الطلبات الحقيقية ستظهر عند إضافة طلبات جديدة</div>' : ''}
+        <h4 style="margin: 20px 0 10px 0; color:#164E63;">📋 آخر الطلبات</h4>
+        <div style="overflow-x: auto;">
+            <table class="reports-table">
+                <thead><tr><th>#</th><th>رقم الطلب</th><th>العميل</th><th>الهاتف</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+                <tbody>
+    `;
     
-    if (totalSalesEl) totalSalesEl.innerText = totalSales.toFixed(2);
-    if (totalProfitEl) totalProfitEl.innerText = totalProfit.toFixed(2);
-    if (totalOrdersEl) totalOrdersEl.innerText = totalOrders;
-    if (pendingEl) pendingEl.innerText = pendingOrders;
-    if (deliveredEl) deliveredEl.innerText = deliveredOrders;
-    if (cancelledEl) cancelledEl.innerText = cancelledOrders;
-    if (returnedEl) returnedEl.innerText = returnedOrders;
+    orders.forEach((order, idx) => {
+        const orderNum = order.orderNumber || order.number || '---';
+        const customerName = order.user?.name || order.customer || '---';
+        const customerPhone = order.user?.phone || order.phone || '---';
+        const statusText = { pending: 'معلق', delivered: 'تم التسليم', cancelled: 'ملغي', returned: 'مرتجع' }[order.status] || 'معلق';
+        
+        html += `<tr>
+                    <td>${idx + 1}</td>
+                    <td><strong>${orderNum}</strong></td>
+                    <td>${customerName}</td>
+                    <td>${customerPhone}</td>
+                    <td>${order.total || 0} ج.م</td>
+                    <td><span class="status-badge status-${order.status || 'pending'}">${statusText}</span></td>
+                    <td><small>${order.date || (order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '---')}</small></td>
+                 </tr>`;
+    });
     
-    // عرض آخر 10 طلبات (جميع الحالات) في جدول أسفل الصفحة
-    const lastOrders = [...allOrders].sort((a, b) => {
-        const dateA = a.createdAt || a.date || '';
-        const dateB = b.createdAt || b.date || '';
-        return new Date(dateB) - new Date(dateA);
-    }).slice(0, 10);
-    
-    const reportsDeliveredOrders = document.getElementById('reports-delivered-orders');
-    if (reportsDeliveredOrders) {
-        if (lastOrders.length === 0) {
-            reportsDeliveredOrders.innerHTML = '<div style="text-align:center; padding:30px; color:#666; background:#f8f9fa; border-radius:12px;">📭 لا توجد طلبات بعد</div>';
-        } else {
-            let html = `
-                <style>
-                    .reports-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; border-radius: 12px; overflow: hidden; }
-                    .reports-table th, .reports-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: right; }
-                    .reports-table th { background: #164E63; color: white; font-weight: 600; }
-                    .reports-table tr:hover { background: #f5f5f5; }
-                    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-                    .status-pending { background: #fff3cd; color: #856404; }
-                    .status-delivered { background: #d4edda; color: #155724; }
-                    .status-cancelled { background: #f8d7da; color: #721c24; }
-                    .status-returned { background: #e2e3e5; color: #383d41; }
-                </style>
-                <h4 style="margin: 15px 0 10px 0; color: #164E63;">📋 آخر 10 طلبات</h4>
-                <table class="reports-table">
-                    <thead>
-                        <tr>
-                            <th>رقم الطلب</th>
-                            <th>العميل</th>
-                            <th>الهاتف</th>
-                            <th>الإجمالي</th>
-                            <th>الحالة</th>
-                            <th>التاريخ</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            for (const order of lastOrders) {
-                const orderNum = order.orderNumber || order.number || order.orderId || '---';
-                const customerName = order.user?.name || order.userName || '---';
-                const customerPhone = order.user?.phone || order.userPhone || '---';
-                const orderTotal = order.total || 0;
-                const orderDate = order.date || (order.createdAt ? new Date(order.createdAt).toLocaleString('ar-EG') : '---');
-                const statusClass = `status-${order.status || 'pending'}`;
-                const statusText = order.status === 'pending' ? 'معلق' : 
-                                  (order.status === 'delivered' ? 'تم التسليم' : 
-                                  (order.status === 'cancelled' ? 'ملغي' : 'مرتجع'));
-                
-                html += `
-                    <tr>
-                        <td><strong>${orderNum}</strong></td>
-                        <td>${customerName}</td>
-                        <td>${customerPhone}</td>
-                        <td>${orderTotal} ج.م</td>
-                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                        <td><small>${orderDate}</small></td>
-                    </tr>
-                `;
-            }
-            
-            html += `
-                    </tbody>
-                </table>
-            `;
-            
-            reportsDeliveredOrders.innerHTML = html;
-        }
-    }
-    
-    console.log('✅ تم تحديث التقارير بنجاح');
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
 }
 // ==================== إصلاح نهائي لصفحة التقارير ====================
 
